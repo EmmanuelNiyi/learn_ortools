@@ -1,38 +1,34 @@
 from ortools.sat.python import cp_model
 
-# Model
+class SolutionPrinter(cp_model.CpSolverSolutionCallback):
+    def __init__(self, variables):
+        cp_model.CpSolverSolutionCallback.__init__(self)
+        self.variables = variables
+        self.solution_count = 0
+
+    def OnSolutionCallback(self):
+        self.solution_count += 1
+        values = {var.Name(): self.Value(var) for var in self.variables}
+        print(f"Solution {self.solution_count}: A={values['A']}, B={values['B']}, C={values['C']}, D={values['D']} "
+              f"→ {10*values['A']+values['B']} + {10*values['B']+values['C']} = {10*values['C']+values['D']}")
+
 model = cp_model.CpModel()
 
-# Variables: time slot for each class
-M = model.NewIntVar(1, 5, 'Math')
-S = model.NewIntVar(1, 5, 'Science')
-H = model.NewIntVar(1, 5, 'History')
+# Variables: digits from 1–9
+A = model.NewIntVar(1, 9, 'A')
+B = model.NewIntVar(1, 9, 'B')
+C = model.NewIntVar(1, 9, 'C')
+D = model.NewIntVar(1, 9, 'D')
 
-# All classes in different slots
-model.AddAllDifferent([M, S, H])
+# All letters must be different
+model.AddAllDifferent([A, B, C, D])
 
-# Math and Science not in consecutive slots
-model.AddAbsEquality(model.NewIntVar(1, 4, 'diff_MS'), M - S)  # store abs(M - S)
-model.Add(model.NewIntVar(1, 4, 'diff_MS') > 1)  # difference must be > 1
+# Cryptarithm constraint: AB + BC = CD
+model.Add((10*A + B) + (10*B + C) == (10*C + D))
 
-# History after Math
-model.Add(H > M)
-
-# Solve: find all solutions
-class AllSolutions(cp_model.CpSolverSolutionCallback):
-    def __init__(self, variables):
-        super().__init__()
-        self.variables = variables
-        self.count = 0
-    def OnSolutionCallback(self):
-        self.count += 1
-        print(f"Solution {self.count}: ", end="")
-        for v in self.variables:
-            print(f"{v.Name()}={self.Value(v)} ", end="")
-        print()
-
-solution_printer = AllSolutions([M, S, H])
+# Solve
 solver = cp_model.CpSolver()
+solution_printer = SolutionPrinter([A, B, C, D])
 solver.SearchForAllSolutions(model, solution_printer)
 
-print(f"\nTotal solutions: {solution_printer.count}")
+print(f"Total solutions found: {solution_printer.solution_count}")
