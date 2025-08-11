@@ -1,11 +1,9 @@
 """
-Fill a 3×3 magic square using the numbers 1–9 so that:
-
-Every number is used exactly once.
-
-The sum of every row, column, and main diagonal is the same (magic constant).
-
-For a 3×3 square, the magic constant = 15.
+Fill the 3×3 grid
+a b c
+d e f
+g h i
+with digits 1–3 so that every row and every column contains each digit exactly once.
 """
 
 from ortools.sat.python import cp_model
@@ -42,38 +40,28 @@ model = cp_model.CpModel()
 # Create 9 variables for the 3x3 grid, domain 1..3
 cells = []
 for i in range(9):
-    var = model.NewIntVar(1, 9, f'cell_{i}')
+    var = model.NewIntVar(1, 3, f'cell_{i}')
     cells.append(var)
-model.AddAllDifferent(cells)
 
 
-def cell(row, col):
+def get_index_value(row, col):
     return cells[row * 3 + col]
 
 
-# Row constraints: each row must have all different values (1, 2 ... 9)
+# Row constraints: each row must have all different values (1, 2, 3)
 for r in range(3):
     row_vars = []
     for c in range(3):
-        i_v = cell(r, c)
-        row_vars.append(i_v)
-    model.Add(sum(row_vars) == 15)
+        row_vars.append(get_index_value(r, c))
+    model.AddAllDifferent(row_vars)
 
-# column constraints: each column mut have all different values (1, 2 ... 9)
+# column constraints: each column mut have all different values (1,2,3)
 for c in range(3):
     column_values = []
     for r in range(3):
-        column_value = cell(r, c)
+        column_value = get_index_value(r, c)
         column_values.append(column_value)
-    model.Add(sum(column_values) == 15)
-
-d1 = [cell(0, 0), cell(1, 1), cell(2, 2)]
-d2 = [cell(0, 2), cell(1, 1), cell(2, 0)]
-
-# diagonal constraints
-
-model.Add(sum(d1) == 15)
-model.Add(sum(d2) == 15)
+    model.AddAllDifferent(column_values)
 
 # Solve and print one solution
 solver = cp_model.CpSolver()
@@ -87,10 +75,14 @@ if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
     for r in range(3):
         row_values = []
         for c in range(3):
-            row_values.append(solver.Value(cell(r, c)))
+            row_values.append(solver.Value(get_index_value(r, c)))
         print(row_values)
 else:
     print("No solution found.")
+
+
+
+
 
 """SOLUTION"""
 # from ortools.sat.python import cp_model

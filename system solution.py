@@ -1,34 +1,66 @@
 from ortools.sat.python import cp_model
 
-class SolutionPrinter(cp_model.CpSolverSolutionCallback):
-    def __init__(self, variables):
+class AllSolutionsPrinter(cp_model.CpSolverSolutionCallback):
+    def __init__(self, variables, rows, cols):
         cp_model.CpSolverSolutionCallback.__init__(self)
-        self.variables = variables
-        self.solution_count = 0
+        self._variables = variables
+        self._rows = rows
+        self._cols = cols
+        self._solution_count = 0
 
     def OnSolutionCallback(self):
-        self.solution_count += 1
-        values = {var.Name(): self.Value(var) for var in self.variables}
-        print(f"Solution {self.solution_count}: A={values['A']}, B={values['B']}, C={values['C']}, D={values['D']} "
-              f"→ {10*values['A']+values['B']} + {10*values['B']+values['C']} = {10*values['C']+values['D']}")
+        self._solution_count += 1
+        print(f"Solution {self._solution_count}:")
+
+        # Print the variables in a grid
+        for r in range(self._rows):
+            row_values = []
+            for c in range(self._cols):
+                index = r * self._cols + c
+                row_values.append(self.Value(self._variables[index]))
+            print(row_values)
+        print()  # blank line between solutions
+
+    def SolutionCount(self):
+        return self._solution_count
 
 model = cp_model.CpModel()
 
-# Variables: digits from 1–9
-A = model.NewIntVar(1, 9, 'A')
-B = model.NewIntVar(1, 9, 'B')
-C = model.NewIntVar(1, 9, 'C')
-D = model.NewIntVar(1, 9, 'D')
+# Variables: 1–9 for each cell
+cells = [model.NewIntVar(1, 9, f'cell_{i}') for i in range(9)]
 
-# All letters must be different
-model.AddAllDifferent([A, B, C, D])
+# All numbers must be different
+model.AddAllDifferent(cells)
 
-# Cryptarithm constraint: AB + BC = CD
-model.Add((10*A + B) + (10*B + C) == (10*C + D))
+# Helper to access cells by (row, col)
+def cell(r, c):
+    return cells[r * 3 + c]
+
+# Magic constant for 3x3
+magic_sum = 15
+
+# Row constraints
+for r in range(3):
+    model.Add(sum(cell(r, c) for c in range(3)) == magic_sum)
+
+# Column constraints
+for c in range(3):
+    model.Add(sum(cell(r, c) for r in range(3)) == magic_sum)
+
+# Diagonal constraints
+model.Add(cell(0, 0) + cell(1, 1) + cell(2, 2) == magic_sum)
+model.Add(cell(0, 2) + cell(1, 1) + cell(2, 0) == magic_sum)
 
 # Solve
 solver = cp_model.CpSolver()
-solution_printer = SolutionPrinter([A, B, C, D])
-solver.SearchForAllSolutions(model, solution_printer)
+solution_printer = AllSolutionsPrinter(cells, 3, 3)
+status = solver.SearchForAllSolutions(model, solution_printer)
+status = solver.Solve(model)
 
-print(f"Total solutions found: {solution_printer.solution_count}")
+print(f"\nTotal solutions found: {solution_printer.SolutionCount()}")
+
+if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+    for r in range(3):
+        print([solver.Value(cell(r, c)) for c in range(3)])
+else:
+    print("No solution found.")
